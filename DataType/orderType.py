@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Optional
 from kungfu.wingchun.constants import Side, Offset, Direction, PriceType, OrderStatus, Exchange
+from enum import Enum
 '''
 此文件为定义订单类型的文件，目前包括了Target, RealTarget, TradeOrder三个类
 '''
@@ -59,3 +60,11 @@ class TradeOrder:
     volume: float                    #成交数量
     tax:float                        #税费
     commission:float                 #手续费
+
+class OrderProcess(Enum):
+    '''
+    订单处理流程
+    '''
+    collect = 0
+    Order = 1
+    Trade = 2

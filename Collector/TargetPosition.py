@@ -6,6 +6,7 @@
 
 from multiprocessing import Queue
 from kungfu.wingchun.constants import Side, Offset, Direction, PriceType, OrderStatus, Exchange
+from DataType.orderType import *
 import pandas as pd
 
 
@@ -15,8 +16,11 @@ import pandas as pd
 3.交易函数执行完毕后，获取对应的交易数据，将该交易数据返回；
 '''
 
+
+
 class TargetPosHander:
     def __init__(self):
+
         # 多个策略传入
         self.targets = Queue()
         self.resTargets=[]
@@ -36,9 +40,13 @@ class TargetPosHander:
             lst.append(self.targets.get())
         return lst
 
-
+    def start(self):
+        self.clear()
+        self.process = self.gen_process()
+        next(self.process)
     #根据Target中的策略id，合约代码，买卖方向，开平方向，计算多个Target的nominal
     def calc_order_nominal(self):
+        # 初始化
         targets = self.get_targets()
         targets = pd.DataFrame(targets)
         # 计算每个策略的nominal总和
@@ -96,19 +104,38 @@ class TargetPosHander:
     # 下单-->前往on_quote()下单-->下单完毕后会更新post_targets列表中的realTarget类
     def order_by_quote(self,context, quote, source, account):
         # 分组聚合后执行下单交易
-        if len(self.pre_targets) > 0:
-            if quote.instrument_id in self.pre_targets.keys():
-                realTargetList = self.pre_targets[quote.instrument_id]
-                for realTarget in realTargetList:
-                    vol = realTarget.nominal/quote.last_price
-                    order_id = context.insert_order(quote.instrument_id, realTarget.exchange, source, account,
-                                                    quote.last_price, vol, PriceType.Limit,
-                                                    realTarget.side, realTarget.offset)
-                    realTarget.order_id = order_id
+        if self.process == OrderProcess.Order or self.process == OrderProcess.Trade:
+            if len(self.pre_targets) > 0:
+                if quote.instrument_id in self.pre_targets.keys():
+                    realTargetList = self.pre_targets[quote.instrument_id]
+                    for realTarget in realTargetList:
+                        vol = realTarget.nominal/quote.last_price
+                        order_id = context.insert_order(quote.instrument_id, realTarget.exchange, source, account,
+                                                        quote.last_price, vol, PriceType.Limit,
+                                                        realTarget.side, realTarget.offset)
+                        realTarget.order_id = order_id
 
-                    self.post_targets[realTarget.order_id] = realTarget
+                        self.post_targets[realTarget.order_id] = realTarget
+                    # 第一个下单完毕后，可以开始接受trade回调信息
+                    if self.process==OrderProcess.Order:
+                        next(self.process) # self.process = OrderProcess.Trade
 
-                del self.pre_targets[quote.instrument_id]
+                    del self.pre_targets[quote.instrument_id]
+
+    def clear(self):
+        self.resTargets = []
+        # self.pre_targets = {}
+        # self.post_targets = {}
+
+    # on_order返回订单信息（无论是否成交）
+    def update_by_order(self, order):
+        if order.order_id in self.post_targets.keys():
+            if order.status == OrderStatus.Cancelled:       #撤单：暂时不操作
+                del self.post_targets[order.order_id]
+            if order.status == OrderStatus.Error:           #错误：暂时不操作
+                del self.post_targets[order.order_id]
+            if order.status == OrderStatus.Lost:            #丢失：暂时不操作
+                del self.post_targets[order.order_id]
 
     # on_trade返回成交回报后的信息-->更新成交后的策略信息
     def update_by_trade(self, trade):
@@ -116,33 +143,44 @@ class TargetPosHander:
         realTarget.real_nominal = trade.volume * trade.price
         realTarget.commission = trade.commission
         realTarget.tax = trade.tax
-
         self.collect_trade(realTarget)
         self.res['realTarget'].append(realTarget)
+        del self.post_targets[trade.order_id]
+
+        if self.process==OrderProcess.Trade and len(self.post_targets)==0:
+            self.process = self.start()
 
 
     # 策略启动时调用
-    def callback_pre(self, context, quote, exchange_id, source_id, account_id, priceType):
-        # 统计按策略和合约的target nominal
-        total_nominal, strt_nominal = self.calc_order_nominal()
-
-        # 计算周期内所有策略的权重
-        self.calc_weights(total_nominal, strt_nominal)
-
-        # 对总订单初始化
-        self.add_total_orders(total_nominal)
+    def callback_init(self):
+        if self.process == OrderProcess.collect:
+            if not self.targets.empty():
+                total_nominal, strt_nominal = self.calc_order_nominal() # 计算策略和账户合约nominal
+                self.calc_weights(total_nominal, strt_nominal) # 计算权重
+                self.add_total_orders(total_nominal)  # 初始化总订单
+                next(self.process)
 
 
+
+
+
+
+    # 行情回调时调用
+    def callback_quote(self, context, quote, source, account):
+        self.order_by_quote(context, quote, source, account)
+
+    # 成交回调时调用
+    def callback_trade(self, context, trade):
+        self.update_by_trade(trade)
+
+    # process生成器
+    def gen_process(self):
+        yield OrderProcess.collect
+        yield OrderProcess.Order
+        yield OrderProcess.Trade
 
         # 未成交订单
         # unFilledIDs = self.handle_unTrade(context, orderIDs)
-
-
-
-
-
-
-
 
 
 

@@ -76,16 +76,18 @@ tarPosHander.add_target(target8)
 # targets = pd.DataFrame(targets)
 
 # 回调计算所有下单至功夫的订单
-total_nominal, strt_nominal = tarPosHander.calc_order_nominal()
-tarPosHander.calc_weights(total_nominal, strt_nominal)
-tarPosHander.add_total_orders(total_nominal)# 初始化总订单
+# total_nominal, strt_nominal = tarPosHander.calc_order_nominal()
+# tarPosHander.calc_weights(total_nominal, strt_nominal)
+# tarPosHander.add_total_orders(total_nominal)# 初始化总订单
+tarPosHander.callback_init()
+
 
 
 
 # 前往on_quote下单:模拟 --> post_targets
 for quote_ in [quote1, quote2, quote3, quote4, quote5, quote6, quote7, quote8]:
-
-    tarPosHander.order_by_quote(context, quote_, 'ctp', '225203')
+    # tarPosHander.order_by_quote(context, quote_, 'ctp', '225203')
+    tarPosHander.callback_quote(context, quote_, 'ctp', '225203')
 order_id_list = list(tarPosHander.post_targets.keys())
 
 # 通过功夫的on_trade获取已成交的信息
@@ -98,8 +100,57 @@ for order_id, real_target in tarPosHander.post_targets.items():
                             real_target.side, real_target.offset, random.randint(200,220), random.randint(5,15), random.randint(1,20),
                             random.randint(1,10))
     tradeInfoList.append(tradeOrder)
+
 # on_trade中调用以下函数
 for trade in tradeInfoList:
-    tarPosHander.update_by_trade(trade)
+    # tarPosHander.update_by_trade(trade)
+    tarPosHander.callback_trade(context, trade)
+
+
+# output
 print(pd.DataFrame(tarPosHander.res['target']))
+# ------------------------------------output(Begin)------------------------------------
+'''
+    strategy_id instrument_id exchange       side             offset    nominal  \
+0      strat1        rb1906    CFFEX   Side.Buy        Offset.Open   30000.24   
+1      strat2        rb1906    CFFEX   Side.Buy        Offset.Open   70000.24   
+2      strat1        rb1906    CFFEX  Side.Sell       Offset.Close   50000.12   
+3      strat1        rb1907    CFFEX  Side.Sell       Offset.Close  100000.24   
+4      strat1        rb1907    CFFEX  Side.Sell  Offset.CloseToday   50000.12   
+    weights  order_id  real_nominal  
+0  0.300001       129    436.801398  
+1  0.699999       129   1019.198602  
+2  1.000000        58   2856.000000  
+3  1.000000       144   1704.000000  
+4  1.000000        66   1881.000000  
+'''
+# ------------------------------------output(end)------------------------------------
+
 print(pd.DataFrame(tarPosHander.res['realTarget']))
+# ------------------------------------output(Begin)------------------------------------
+'''
+    instrument_id exchange       side             offset    nominal  order_id  \
+0        rb1906    CFFEX   Side.Buy        Offset.Open  100000.48       129   
+1        rb1906    CFFEX  Side.Sell       Offset.Close   50000.12        58   
+2        rb1907    CFFEX  Side.Sell       Offset.Close  100000.24       144   
+3        rb1907    CFFEX  Side.Sell  Offset.CloseToday   50000.12        66   
+   real_nominal  tax  commission  
+0          1456   15           1  
+1          2856    7           3  
+2          1704    3          10  
+3          1881   14           6  
+'''
+# ------------------------------------output(end)------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+# ------------------------------------output------------------------------------
