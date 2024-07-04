@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from clickhouse_driver import errors
 '''
 数据库的基类，用于定义数据库的基本操作，可连接不同数据库类型；
 目前已连接的数据库类型:clickhouse
@@ -8,43 +9,67 @@ class DataBase(ABC):
     所有数据库的基类,根据实际需求增加方法
     '''
     @abstractmethod
-    def connect(self):
+    def connect(self, *args):
         pass
 
     @abstractmethod
-    def create_table(self, table_name:str, sql_lang:str):
+    def create_table(self, *args):
         pass
 
     @abstractmethod
-    def insert_data(self, table_name:str, columns:str, sql_lang:str):
+    def insert_data(self, *args):
         pass
 
 
 class ClickHouseDB(DataBase):
-    '''
+    """
     使用clickhouse相关的api构建database
-    '''
-    def __init__(self,host:str='localhost',port:str='9000',database:str='default',user:str='default',password:str=''):
+    """
+    def __init__(self, host:str, port:str, database:str, user:str, password:str):
         self.host = host
         self.port = port
         self.database = database
         self.user = user
         self.password = password
-        self.client = self.connect()
+        # self.client = self.connect()
+
 
     def connect(self):
         from clickhouse_driver import Client
-        self.client = Client(host=self.host, port=self.port, database=self.database, user=self.user, password=self.password)
-        return self.client
+        client = Client(host=self.host, port=self.port, database=self.database, user=self.user,
+                        password=self.password)
 
-    def create_table(self, table_name:str, sql_lang:str):
-        self.client.execute(f"CREATE TABLE {table_name} {sql_lang}")
+        return self.__valid_connect(client)
 
-    def insert_data(self, table_name:str, columns:str, sql_lang:str):
-        self.client.execute(f"INSERT INTO {table_name} ({columns}) VALUES {sql_lang}")
+    def create_table(self, client, table_name:str, sql_lang:str):
+        client.execute(f"CREATE TABLE {table_name} {sql_lang}")
 
-    def insert_one_col(self, table_name: str, column: str, sql_lang: str):
-        self.client.execute(f"INSERT INTO {table_name} ({column}) VALUES ({sql_lang})")
+    def insert_data(self, client, table_name:str, columns:str, sql_lang:str):
+        client.execute(f"INSERT INTO {table_name} ({columns}) VALUES {sql_lang}")
+
+    def insert_one_col(self, client, table_name: str, column: str, sql_lang: str):
+        client.execute(f"INSERT INTO {table_name} ({column}) VALUES ({sql_lang})")
+
+
+    def __valid_connect(self, client):
+        try:
+            client.execute('show tables')
+            return client
+        except errors.SocketTimeoutError:
+            raise ValueError('Invalid host')
+        except BrokenPipeError:
+            raise ValueError('Invalid databse, please input correct database name to connect')
+        except errors.ServerException:
+            raise ValueError('Invalid user or password')
+        except errors.NetworkError:
+            raise ValueError('Invalid port')
+
+    @staticmethod
+    def exec(client, sql_lang:str):
+        return client.execute(sql_lang)
+
+
+
 
 class UpdateLang:
     '''
@@ -59,8 +84,21 @@ class UpdateLang:
         quote.settlement_price, quote.bid_price, quote.ask_price, quote.bid_volume, quote.ask_volume}"""
 
     @staticmethod
+    def update_bar(bar):
+        return f"""{bar.instrument_id, bar.exchange_id, bar.start_time, bar.end_time,
+        bar.open, bar.high, bar.low, bar.close, bar.open_interest, bar.volume, bar.turnover,
+        bar.ask_price, bar.bid_price, bar.ask_volume, bar.bid_volume}"""
+    @staticmethod
     def update_pos(pos):
         pass
+
+
+
+
+
+
+
+
 
 '''
 from dataclasses import dataclass, field

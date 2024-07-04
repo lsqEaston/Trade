@@ -19,7 +19,7 @@ def getContracts(*args:HJEnums.Exchange)->dict:
     symbols = {}
     def BytushareAPI(symbols):
         import tushare as ts
-        pro = ts.pro_api('9f94841049b8567fb3f67bf212b19a3f391cdfdd3c277345ef382013')
+        pro = ts.pro_api('0d9223de9a848ebf6f2e268039b1762919bfbcb1826df44246220d4c')
         today = datetime.datetime.now().strftime("%Y%m%d")
 
 

@@ -14,9 +14,11 @@ class Target:
     side: Side                                                          #买卖方向
     offset: Offset                                                      #开平方向
     nominal: float                                                      #名义价值,包括了multiply
+    limit_price: float                                                  #交易限价
     weights:Optional[float] = field(default=None, init=False)           #权重
     order_id:Optional[int] = field(default=None, init=False)            #订单id(与实际成交相匹配的订单，存在一个订单匹配多个策略Target类的情况)
     real_nominal:Optional[float]= field(default=None, init=False)       #实际买入的金额
+
 
     def __eq__(self, other):
         if self.instrument_id == other.instrument_id and self.side == other.side and self.offset == other.offset:
@@ -26,15 +28,17 @@ class Target:
 
 @dataclass
 class RealTarget:
-    instrument_id: str                                                  #合约代码
-    exchange: Exchange                                                  #合约对应的交易所
-    side: Side                                                          #买卖方向
-    offset: Offset                                                      #开平方向
-    nominal: float                                                      #名义价值,预期买入的金额
-    order_id: Optional[int]= field(default=None, init=False)         # 订单id
-    real_nominal:Optional[float]= field(default=None, init=False)       #实际买入的金额
-    tax:Optional[float]= field(default=None, init=False)                #税费
-    commission:Optional[float]= field(default=None, init=False)         #手续费
+    instrument_id: str                                                  # 合约代码
+    exchange: Exchange                                                  # 合约对应的交易所
+    side: Side                                                          # 买卖方向
+    offset: Offset                                                      # 开平方向
+    nominal: float                                                      # 名义价值,预期买入的金额
+    limit_price: float                                                  # 交易限价
+    order_id: Optional[int]= field(default=None, init=False)            # 订单id
+    real_nominal:Optional[float]= field(default=None, init=False)       # 实际买入的金额
+    tax:Optional[float]= field(default=None, init=False)                # 税费
+    commission:Optional[float]= field(default=None, init=False)         # 手续费
+
 
     def __eq__(self, other):
         if self.instrument_id == other.instrument_id and self.side == other.side and self.offset == other.offset:
@@ -68,3 +72,9 @@ class OrderProcess(Enum):
     collect = 0
     Order = 1
     Trade = 2
+
+class OrderFollow(Enum):
+    Drop = 0                        # 在规定时间内未成交单直接撤单，后续不再对该单进行下单
+    Keep = 1                        # 直到所有单成交才进行下一轮订单分发
+    Append = 2                      # 本轮未成交的单，撤单后继续跟单
+
