@@ -1,1 +1,11 @@
 qodana.yaml
+
+token.json
+
+*.DS_Store
+
+.idea
+
+# 测试文件
+demo.py
+test.py
